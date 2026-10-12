@@ -34,8 +34,16 @@ import type {
 import type { ComputerStatus } from "./schema";
 
 export const DEFAULT_BOAT_BASE_URL = "https://boat.dev/api/v1";
+/**
+ * The computer image, PINNED, never `latest`.
+ *
+ * This fork's `agent-computer/` is byte for byte the code CopilotKit released as v0.1.2, so that
+ * release's image is exactly this fork's computer. `latest` would quietly move every Bot's computer to
+ * whatever upstream ships next, which may expect a newer server than this fork runs. Change this only
+ * when the fork itself is deliberately brought up to a newer upstream release.
+ */
 export const DEFAULT_BOAT_COMPUTER_IMAGE =
-  "ghcr.io/copilotkit/openbot-agent-computer:latest";
+  "ghcr.io/copilotkit/openbot-agent-computer:v0.1.2";
 
 /** The port `agent-computer` listens on, inside its container and on the sandbox's loopback. */
 const COMPUTER_PORT = 4100;

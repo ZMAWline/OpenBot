@@ -37,12 +37,12 @@ pub struct Installed {
 /// A release asset rather than a branch, and https rather than git, so nothing needs a git client
 /// or credentials to get a deployment.
 pub fn tarball_url(version: &str) -> String {
-    format!("https://github.com/CopilotKit/OpenBot/archive/refs/tags/{version}.tar.gz")
+    format!("https://github.com/ZMAWline/OpenBot/archive/refs/tags/{version}.tar.gz")
 }
 
 /// Where the release publishes its image manifest.
 pub fn images_url(version: &str) -> String {
-    format!("https://github.com/CopilotKit/OpenBot/releases/download/{version}/{IMAGES}")
+    format!("https://github.com/ZMAWline/OpenBot/releases/download/{version}/{IMAGES}")
 }
 
 pub fn images_path(root: &Path) -> PathBuf {

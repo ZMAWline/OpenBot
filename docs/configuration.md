@@ -769,7 +769,7 @@ needs neither a supervisor nor a Docker socket, and the one-container image gets
 | `COMPUTER_TOKEN`      | Required with Boat. Each computer's port is published at a Boat HTTPS address and this token is what it refuses callers without. |
 | `BOAT_MACHINE_TYPE`   | `small` (half rate), `default`, `large` or `xlarge`. Boat's default when unset.               |
 | `BOAT_IDLE_AFTER`     | How long a sandbox runs untouched before Boat stops it and snapshots its disk. `30m` by default. |
-| `BOAT_COMPUTER_IMAGE` | The computer image each sandbox runs. `ghcr.io/copilotkit/openbot-agent-computer:latest` by default. |
+| `BOAT_COMPUTER_IMAGE` | The computer image each sandbox runs. `ghcr.io/copilotkit/openbot-agent-computer:v0.1.2` by default: pinned to the release this fork's computer code matches, so upstream releases never reach it by themselves. |
 | `BOAT_ORG`            | Bill a Boat organization rather than the key's personal wallet.                                |
 | `BOAT_BASE_URL`       | Boat's API. `https://boat.dev/api/v1` by default.                                              |
 | `DEPLOYMENT_ID`       | Also names the sandboxes (`openbot-<deployment>-<bot>`), so two deployments can share one Boat account. |
@@ -782,7 +782,7 @@ How it behaves:
 - **Stop** (Admin → Computers, or idle) stops the sandbox. Boat snapshots its disk, so the Bot's
   browser logins and `/workspace` come back on the next use. **Reset** deletes the sandbox and its
   snapshots.
-- **Update computer** pulls the image again and replaces the container if it changed.
+- **Update computer** pulls the pinned image again and replaces the container only if it changed. It never moves to a newer upstream version.
 - The token reaches each sandbox as a per-sandbox environment variable, never in a command line, so it
   is not in Boat's command history. Rotating `COMPUTER_TOKEN` takes effect on each computer the next
   time it is woken.
