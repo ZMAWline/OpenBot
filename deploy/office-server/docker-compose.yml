@@ -1,0 +1,59 @@
+# OpenBot on one server you own, reached privately over Tailscale.
+#
+# `install.sh` writes `.env` beside this file and runs `docker compose up`; you rarely need to touch
+# this file. What it runs:
+#
+#   openbot  the app, the API and its own PostgreSQL, all in the one image built from this fork.
+#            Published on 127.0.0.1 only: nothing on the office network or the internet can reach
+#            it directly. Tailscale (`tailscale serve`) is the only way in, with HTTPS.
+#   sweeps   the scheduled jobs the one image leaves out: firing routines every five minutes and
+#            clearing unsent attachments once an hour. It shares `openbot`'s network, so it reaches
+#            the API and the database on 127.0.0.1 exactly as the API does.
+#
+# Each Bot's computer is not here. With BOAT_API_KEY set, every Bot gets its own Boat cloud
+# machine, so this server needs no Chromium per Bot and no Docker socket handed to anything.
+name: openbot
+
+services:
+  openbot:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    image: openbot-office:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      EMBEDDED_POSTGRES: "on"
+    ports:
+      - "127.0.0.1:3001:3001"
+    volumes:
+      # The parent directory, not .../data: see docs/deployment.md.
+      - openbot-data:/var/lib/postgresql
+    shm_size: "1gb"
+
+  sweeps:
+    image: openbot-office:latest
+    restart: unless-stopped
+    depends_on:
+      openbot:
+        condition: service_healthy
+    network_mode: "service:openbot"
+    env_file: .env
+    environment:
+      SERVER_INTERNAL_URL: http://127.0.0.1:3001
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        cd /app/server
+        n=0
+        while true; do
+          bun scripts/fire-routines.ts || echo "routine sweep failed; trying again in 5 minutes"
+          if [ $$((n % 12)) -eq 0 ]; then
+            bun scripts/cull-staged-attachments.ts || echo "attachment sweep failed"
+          fi
+          n=$$((n + 1))
+          sleep 300
+        done
+
+volumes:
+  openbot-data:

@@ -73,10 +73,34 @@ export type SandboxComputerConfig = {
   policy?: ActionPolicy;
 };
 
+/**
+ * A computer each, as a Boat (boat.dev) sandbox.
+ *
+ * Boat hosts the VMs, so this deployment needs no Docker socket and no cluster to give every Bot a
+ * computer of its own. See `computer/boat.ts`.
+ */
+export type BoatComputerConfig = {
+  provider: "boat";
+  apiKey: string;
+  /** Required here, not optional: a published Boat port with no token in front of it is an open browser. */
+  token: string;
+  baseUrl?: string;
+  image?: string;
+  machineType?: "small" | "default" | "large" | "xlarge";
+  idleAfterMs: number;
+  deploymentId?: string;
+  org?: string;
+  browserMode?: string;
+  passthroughEnv?: Record<string, string>;
+  allowPrivateHosts: boolean;
+  policy?: ActionPolicy;
+};
+
 export type ComputerConfig =
   | DockerComputerConfig
   | SharedComputerConfig
-  | SandboxComputerConfig;
+  | SandboxComputerConfig
+  | BoatComputerConfig;
 
 /**
  * Who a deployment lets in, and through which front door.
@@ -477,7 +501,9 @@ function singleUserAllowed(
     ...commaSeparated(environment, "TRUSTED_ORIGINS"),
   ].filter((value): value is string => value !== undefined);
 
-  const published = reachable.filter((value) => reachOf(value) === "public");
+  const published = reachable.filter(
+    (value) => reachOf(value, environment) === "public",
+  );
   if (published.length > 0) {
     throw new Error(
       `OPENBOT_SINGLE_USER admits every request as one administrator with no sign-in, so it cannot be combined with an address the public internet reaches: ${published.join(", ")}. Configure GOOGLE_OAUTH_*, MICROSOFT_OAUTH_* or OKTA_OAUTH_* with BETTER_AUTH_SECRET and BETTER_AUTH_URL, or serve it somewhere only you reach.`,
@@ -489,7 +515,9 @@ function singleUserAllowed(
    * no sign-in; what it cannot say, because it never reads an address, is that this one is carried
    * beyond the machine. Whoever is on that network is an administrator here.
    */
-  const shared = reachable.filter((value) => reachOf(value) === "private");
+  const shared = reachable.filter(
+    (value) => reachOf(value, environment) === "private",
+  );
   if (shared.length > 0) {
     console.warn(
       `OPENBOT_SINGLE_USER admits every request as one administrator with no sign-in, and this deployment answers on an address beyond this machine: ${shared.join(", ")}. Anybody on that network is that administrator. Configure a sign-in provider before anybody else is on it.`,
@@ -515,7 +543,7 @@ function singleUserAllowed(
  */
 type Reach = "loopback" | "private" | "public";
 
-function reachOf(raw: string): Reach {
+function reachOf(raw: string, environment: Environment = {}): Reach {
   let bare: string;
   try {
     bare = new URL(raw).hostname.toLowerCase();
@@ -560,7 +588,13 @@ function reachOf(raw: string): Reach {
     bare.endsWith(".local") ||
     bare.endsWith(".internal") ||
     bare.endsWith(".lan") ||
-    bare.endsWith(".home.arpa");
+    bare.endsWith(".home.arpa") ||
+    // A Tailscale MagicDNS name: it resolves to a 100.64/10 address that only the tailnet routes,
+    // the same reach as that address, which is already private above. Tailscale Funnel is the one
+    // way to put such a name on the public internet; `deploy/office-server` uses `tailscale serve`,
+    // which does not, and sets OPENBOT_TAILSCALE_FUNNEL only if somebody turns Funnel on.
+    (optional(environment, "OPENBOT_TAILSCALE_FUNNEL") !== "on" &&
+      bare.endsWith(".ts.net"));
   return privateName ? "private" : "public";
 }
 
@@ -1052,7 +1086,13 @@ function computerConfig(environment: Environment): ComputerConfig | undefined {
   const supervisorAddress = optional(environment, "COMPUTER_SUPERVISOR_URL");
   const sharedAddress = optional(environment, "AGENT_COMPUTER_URL");
   const sandboxNamespace = optional(environment, "COMPUTER_SANDBOX_NAMESPACE");
-  if (!supervisorAddress && !sharedAddress && !sandboxNamespace) {
+  const boatApiKey = optional(environment, "BOAT_API_KEY");
+  if (
+    !supervisorAddress &&
+    !sharedAddress &&
+    !sandboxNamespace &&
+    !boatApiKey
+  ) {
     return undefined;
   }
 
@@ -1065,6 +1105,20 @@ function computerConfig(environment: Environment): ComputerConfig | undefined {
 
   const allowPrivateHosts = privateHostsAllowed(environment);
   const policy = actionPolicy(environment);
+
+  /*
+   * Boat first, for the same reason the namespace comes before the other two: a deployment that gave
+   * a Boat key means Boat to make the computers, and a leftover `AGENT_COMPUTER_URL` must not quietly
+   * put every Bot back on one shared browser.
+   */
+  if (boatApiKey) {
+    return boatComputerConfig(environment, {
+      apiKey: boatApiKey,
+      computerToken,
+      allowPrivateHosts,
+      policy,
+    });
+  }
 
   /*
    * Checked before the other two, because a deployment that named a namespace means the cluster to
@@ -1111,6 +1165,62 @@ function computerConfig(environment: Environment): ComputerConfig | undefined {
     allowPrivateHosts,
     ...(computerToken ? { token: computerToken } : {}),
     ...(policy ? { policy } : {}),
+  };
+}
+
+const BOAT_MACHINE_TYPES = ["small", "default", "large", "xlarge"] as const;
+
+/** `BOAT_*` read into a computer config, refusing at boot what Boat would refuse later. */
+function boatComputerConfig(
+  environment: Environment,
+  found: {
+    apiKey: string;
+    computerToken: string | undefined;
+    allowPrivateHosts: boolean;
+    policy: ActionPolicy | undefined;
+  },
+): BoatComputerConfig {
+  if (!found.computerToken) {
+    throw new Error(
+      "BOAT_API_KEY is set, so each Bot's computer is published at a Boat address, and COMPUTER_TOKEN is what keeps strangers out of it. Set COMPUTER_TOKEN (openssl rand -hex 32).",
+    );
+  }
+  const machineType = optional(environment, "BOAT_MACHINE_TYPE");
+  if (
+    machineType !== undefined &&
+    !(BOAT_MACHINE_TYPES as readonly string[]).includes(machineType)
+  ) {
+    throw new Error(
+      `BOAT_MACHINE_TYPE must be one of ${BOAT_MACHINE_TYPES.join(", ")}, not ${JSON.stringify(machineType)}.`,
+    );
+  }
+  const passthroughEnv = Object.fromEntries(
+    Object.entries(environment).filter(
+      (entry): entry is [string, string] =>
+        entry[0].startsWith("EGRESS_PROXY") && typeof entry[1] === "string",
+    ),
+  );
+  const baseUrl = url(environment, "BOAT_BASE_URL");
+  const image = optional(environment, "BOAT_COMPUTER_IMAGE");
+  const deploymentId = optional(environment, "DEPLOYMENT_ID");
+  const org = optional(environment, "BOAT_ORG");
+  const browserMode = optional(environment, "COMPUTER_BROWSER_MODE");
+  return {
+    provider: "boat",
+    apiKey: found.apiKey,
+    token: found.computerToken,
+    idleAfterMs: durationMs(optional(environment, "BOAT_IDLE_AFTER") ?? "30m"),
+    allowPrivateHosts: found.allowPrivateHosts,
+    ...(baseUrl ? { baseUrl } : {}),
+    ...(image ? { image } : {}),
+    ...(machineType
+      ? { machineType: machineType as BoatComputerConfig["machineType"] }
+      : {}),
+    ...(deploymentId ? { deploymentId } : {}),
+    ...(org ? { org } : {}),
+    ...(browserMode ? { browserMode } : {}),
+    ...(Object.keys(passthroughEnv).length > 0 ? { passthroughEnv } : {}),
+    ...(found.policy ? { policy: found.policy } : {}),
   };
 }
 

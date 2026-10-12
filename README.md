@@ -2,6 +2,16 @@
 
 # OpenBot
 
+> **This fork (ZMAWline/openbot)** adds two things to CopilotKit's OpenBot:
+>
+> 1. **Boat computers.** Set `BOAT_API_KEY` and each Bot's computer runs on its own
+>    [Boat](https://boat.dev) cloud VM instead of a Docker container on your server
+>    ([details](docs/configuration.md#computers-on-boat)).
+> 2. **Your own server, every device.** [`deploy/office-server`](deploy/office-server/README.md)
+>    installs it on one server with a single command and makes it reachable from your phone, PCs and
+>    laptops over Tailscale, privately and with HTTPS. The web app can be added to a phone's home
+>    screen.
+
 **The AI assistant your company can actually own.** Same shape as ChatGPT, Claude or Grok, with one difference that matters: it runs on your infrastructure and you can change anything about it. Any agent stack, through AG-UI.
 
 Each coworker gets a computer of its own: a real browser with its own logins, its own files, and only the tools you grant. Every action decided before it happens and recorded after.

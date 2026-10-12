@@ -549,6 +549,10 @@ describe("deployment configuration", () => {
     ["a unique-local IPv6 address", { OPENBOT_PUBLIC_URL: "http://[fd00::1]" }],
     ["an mDNS name", { TRUSTED_ORIGINS: "http://openbot.local:3010" }],
     ["a single-label LAN name", { TRUSTED_ORIGINS: "http://nas:3010" }],
+    [
+      "a Tailscale MagicDNS name",
+      { OPENBOT_PUBLIC_URL: "https://office.tail1234.ts.net" },
+    ],
   ])("still runs with no sign-in on %s", (_label, reachable) => {
     expect(() =>
       loadConfig({ ...withoutSignIn, ...OPEN, ...reachable }),
@@ -560,6 +564,19 @@ describe("deployment configuration", () => {
   test.each([
     ["just outside 172.16/12", { OPENBOT_PUBLIC_URL: "http://172.32.0.1" }],
     ["just outside 100.64/10", { OPENBOT_PUBLIC_URL: "http://100.128.0.1" }],
+    // Funnel puts a ts.net name on the public internet, and so it is the public case again.
+    [
+      "a Tailscale name with Funnel on",
+      {
+        OPENBOT_PUBLIC_URL: "https://office.tail1234.ts.net",
+        OPENBOT_TAILSCALE_FUNNEL: "on",
+      },
+    ],
+    // Only the ts.net suffix, not a look-alike.
+    [
+      "a name that merely contains ts.net",
+      { OPENBOT_PUBLIC_URL: "https://ts.net.example.com" },
+    ],
   ])("refuses no sign-in on %s", (_label, published) => {
     expect(() =>
       loadConfig({ ...withoutSignIn, ...OPEN, ...published }),
@@ -766,6 +783,43 @@ describe("deployment configuration", () => {
       token: "computer-token",
       allowPrivateHosts: false,
     });
+  });
+
+  test("configures a Boat computer each, ahead of a leftover shared address", () => {
+    const config = loadConfig({
+      ...baseEnvironment,
+      BOAT_API_KEY: "boat-key",
+      BOAT_MACHINE_TYPE: "small",
+      BOAT_IDLE_AFTER: "20m",
+      AGENT_COMPUTER_URL: "http://localhost:4100",
+      COMPUTER_TOKEN: "computer-token",
+    });
+
+    expect(config.computer).toEqual({
+      provider: "boat",
+      apiKey: "boat-key",
+      token: "computer-token",
+      machineType: "small",
+      idleAfterMs: 20 * 60_000,
+      allowPrivateHosts: false,
+    });
+  });
+
+  test("refuses Boat computers without a computer token", () => {
+    expect(() =>
+      loadConfig({ ...baseEnvironment, BOAT_API_KEY: "boat-key" }),
+    ).toThrow("COMPUTER_TOKEN");
+  });
+
+  test("refuses a Boat machine size Boat does not have", () => {
+    expect(() =>
+      loadConfig({
+        ...baseEnvironment,
+        BOAT_API_KEY: "boat-key",
+        COMPUTER_TOKEN: "computer-token",
+        BOAT_MACHINE_TYPE: "huge",
+      }),
+    ).toThrow("BOAT_MACHINE_TYPE");
   });
 
   test("leaves computers off when no provider address is configured", () => {

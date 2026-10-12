@@ -1,4 +1,5 @@
 import type { ComputerConfig } from "../config";
+import { createBoatComputerProvider } from "./boat";
 import {
   createSandboxComputerProvider,
   inClusterConfig,
@@ -299,6 +300,21 @@ export function createComputerProvider(
        * rather than the file being read on every call.
        */
       return createLazySandboxProvider(config);
+    case "boat":
+      return createBoatComputerProvider({
+        apiKey: config.apiKey,
+        computerToken: config.token,
+        idleAfterMs: config.idleAfterMs,
+        ...(config.baseUrl ? { baseUrl: config.baseUrl } : {}),
+        ...(config.image ? { image: config.image } : {}),
+        ...(config.machineType ? { machineType: config.machineType } : {}),
+        ...(config.deploymentId ? { deploymentId: config.deploymentId } : {}),
+        ...(config.org ? { org: config.org } : {}),
+        ...(config.browserMode ? { browserMode: config.browserMode } : {}),
+        ...(config.passthroughEnv
+          ? { passthroughEnv: config.passthroughEnv }
+          : {}),
+      });
   }
 }
 

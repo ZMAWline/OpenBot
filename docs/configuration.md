@@ -757,6 +757,38 @@ docker volume ls -q --filter "label=openbot.namespace=openbot" | xargs -r docker
 
 Proxy credentials may appear in proxy URLs, but the computer strips them before reporting proxy status.
 
+## Computers on Boat
+
+[Boat](https://boat.dev) hosts Linux VMs with Docker preinstalled. With `BOAT_API_KEY` set, each Bot's
+computer is the usual `agent-computer` image running on a Boat sandbox of its own, so the deployment
+needs neither a supervisor nor a Docker socket, and the one-container image gets a computer per Bot.
+
+| Variable              | Meaning                                                                                        |
+| --------------------- | ---------------------------------------------------------------------------------------------- |
+| `BOAT_API_KEY`        | Turns Boat computers on. Takes precedence over `COMPUTER_SUPERVISOR_URL` and `AGENT_COMPUTER_URL`. |
+| `COMPUTER_TOKEN`      | Required with Boat. Each computer's port is published at a Boat HTTPS address and this token is what it refuses callers without. |
+| `BOAT_MACHINE_TYPE`   | `small` (half rate), `default`, `large` or `xlarge`. Boat's default when unset.               |
+| `BOAT_IDLE_AFTER`     | How long a sandbox runs untouched before Boat stops it and snapshots its disk. `30m` by default. |
+| `BOAT_COMPUTER_IMAGE` | The computer image each sandbox runs. `ghcr.io/copilotkit/openbot-agent-computer:latest` by default. |
+| `BOAT_ORG`            | Bill a Boat organization rather than the key's personal wallet.                                |
+| `BOAT_BASE_URL`       | Boat's API. `https://boat.dev/api/v1` by default.                                              |
+| `DEPLOYMENT_ID`       | Also names the sandboxes (`openbot-<deployment>-<bot>`), so two deployments can share one Boat account. |
+
+How it behaves:
+
+- **First use** creates the sandbox (`noEnv`, so it carries none of the Boat account's own secrets),
+  starts the computer container on it, and publishes port 4100. Expect a minute or two the first
+  time while the image is pulled.
+- **Stop** (Admin → Computers, or idle) stops the sandbox. Boat snapshots its disk, so the Bot's
+  browser logins and `/workspace` come back on the next use. **Reset** deletes the sandbox and its
+  snapshots.
+- **Update computer** pulls the image again and replaces the container if it changed.
+- The token reaches each sandbox as a per-sandbox environment variable, never in a command line, so it
+  is not in Boat's command history. Rotating `COMPUTER_TOKEN` takes effect on each computer the next
+  time it is woken.
+- Boat cannot enforce an egress policy at the VM. The action policy and the gateway still decide
+  every browser and file action, as they do for any provider.
+
 ## Attested identity
 
 When optional SPIRE services are used:
