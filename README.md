@@ -2,7 +2,7 @@
 
 # OpenBot
 
-> **This fork (ZMAWline/openbot)** adds two things to CopilotKit's OpenBot:
+> **This fork (ZMAWline/OpenBot)** adds two things to CopilotKit's OpenBot:
 >
 > 1. **Boat computers.** Set `BOAT_API_KEY` and each Bot's computer runs on its own
 >    [Boat](https://boat.dev) cloud VM instead of a Docker container on your server

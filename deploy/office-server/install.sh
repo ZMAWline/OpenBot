@@ -4,7 +4,7 @@
 #
 # Run on the server (Ubuntu 22.04 or 24.04, or Debian 12):
 #
-#   curl -fsSL https://raw.githubusercontent.com/ZMAWline/openbot/main/deploy/office-server/install.sh | sudo bash
+#   curl -fsSL https://raw.githubusercontent.com/ZMAWline/OpenBot/main/deploy/office-server/install.sh | sudo bash
 #
 # or, from a copy of the repository:
 #
@@ -13,7 +13,7 @@
 # Safe to run again: it keeps an existing .env and only asks for what is missing.
 set -euo pipefail
 
-REPO_URL="${OPENBOT_REPO_URL:-https://github.com/ZMAWline/openbot.git}"
+REPO_URL="${OPENBOT_REPO_URL:-https://github.com/ZMAWline/OpenBot.git}"
 BRANCH="${OPENBOT_BRANCH:-main}"
 INSTALL_DIR="${OPENBOT_DIR:-/opt/openbot}"
 KIT="deploy/office-server"

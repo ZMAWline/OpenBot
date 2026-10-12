@@ -29,7 +29,7 @@ server.
 On the server:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/ZMAWline/openbot/main/deploy/office-server/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/ZMAWline/OpenBot/main/deploy/office-server/install.sh | sudo bash
 ```
 
 It installs Docker and Tailscale, joins your tailnet (it shows a link to approve), asks for the keys
